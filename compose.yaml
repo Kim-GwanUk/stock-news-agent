@@ -1,3 +1,5 @@
+name: stockproject
+
 services:
   qdrant:
     image: qdrant/qdrant:v1.17.0
