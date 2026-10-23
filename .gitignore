@@ -1,0 +1,35 @@
+.env
+.env.*
+!.env.example
+tmp/
+.venv/
+data/
+**/node_modules/
+**/__pycache__/
+.pytest_cache/
+
+# Local reports, screenshots, database backups and runtime files
+output/
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+*.log
+*.pyc
+backups/
+test_localsystem.txt
+
+# Personal tooling and credentials
+.streamlit/secrets.toml
+.codex/
+.agents/
+.aws/
+.ssh/
+.idea/
+.vscode/
+*.pem
+*.key
+*.p12
+*.pfx
+Thumbs.db
+.DS_Store

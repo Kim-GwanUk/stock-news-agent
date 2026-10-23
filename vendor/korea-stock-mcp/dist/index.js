@@ -1,0 +1,110 @@
+#!/usr/bin/env node --max-old-space-size=4096
+import dotenv from "dotenv";
+// Credentials are passed explicitly by the parent process.
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import * as dart from "./dart/index.js";
+import * as krx from "./krx/index.js";
+import * as common from "./common/index.js";
+const server = new McpServer({
+    name: "korea-stock-mcp",
+    version: "1.0.0",
+}, {
+    capabilities: {
+        tools: {},
+    },
+});
+/**
+ * DART
+ */
+server.tool("get_corp_code", `고유번호: DART에 등록되어있는 공시대상회사의 고유번호, 회사명, 종목코드를 제공합니다. 비상장법인도 조회 가능합니다.
+회사명(corp_name, 한글 또는 영문) 또는 종목코드(stock_code) 중 하나로 조회할 수 있습니다.
+회사명은 부분 일치 검색을 지원하므로 정확한 이름을 몰라도 조회할 수 있습니다.
+IMPORTANT: 한글 회사명을 정확히 모르는 경우(예: 영문명만 아는 경우), 반드시 웹 검색으로 정확한 한글 정식 명칭을 먼저 확인한 뒤 corp_name에 입력하세요.`, dart.getCorpCodeSchema.shape, async (params) => {
+    const args = dart.getCorpCodeSchema.parse(params);
+    const response = await dart.getCorpCode(args);
+    return {
+        content: [{ type: "text", text: JSON.stringify(response) }],
+    };
+});
+server.tool("get_disclosure_list", `
+  공시검색: 공시 유형별, 회사별, 날짜별 등 여러가지 조건으로 공시보고서 검색기능을 제공합니다.
+  최근 공시를 검색할때는 bgn_de를 반드시 지정하세요.
+  `, dart.getDisclosureListSchema.shape, async (params) => {
+    const args = dart.getDisclosureListSchema.parse(params);
+    const response = await dart.getDisclosureList(args);
+    return {
+        content: [{ type: "text", text: JSON.stringify(response) }],
+    };
+});
+server.tool("get_disclosure", `DART API를 통해 공시보고서 원본파일을 파싱해 가져옵니다.
+문서가 큰 경우(1MB 초과) 목차(type: "toc")를 반환합니다.
+목차가 반환되면 유저의 질문과 관련된 섹션을 section_id로 조회하세요.
+답변 후, 조회하지 않은 나머지 섹션 목록을 유저에게 안내하여 추가 조회 여부를 선택할 수 있게 하세요.
+해당 섹션도 1MB를 초과하면 하위 목차를 반환합니다.`, dart.getDisclosureSchema.shape, async (params) => {
+    const args = dart.getDisclosureSchema.parse(params);
+    const response = await dart.getDisclosure(args);
+    return {
+        content: [{ type: "text", text: JSON.stringify(response) }],
+    };
+});
+server.tool("get_financial_statement", "재무제표: 상장법인(유가증권, 코스닥) 및 주요 비상장법인(사업보고서 제출대상 & IFRS 적용)이 제출한 정기보고서 내에 XBRL재무제표의 모든계정과목을 제공합니다.", dart.getFinancialStatementSchema.shape, async (params) => {
+    const args = dart.getFinancialStatementSchema.parse(params);
+    const response = await dart.getFinancialStatement(args);
+    return {
+        content: [{ type: "text", text: JSON.stringify(response) }],
+    };
+});
+server.tool("get_market_type", `
+  DART에 등록되어 있는 종목의 상장시장 정보를 제공합니다.
+  Y(유가), K(코스닥), N(코넥스), E(기타)
+  `, dart.getMarketTypeSchema.shape, async (params) => {
+    const args = dart.getMarketTypeSchema.parse(params);
+    const response = await dart.getMarketType(args);
+    return {
+        content: [{ type: "text", text: JSON.stringify(response) }],
+    };
+});
+/**
+ * KRX
+ */
+server.tool("get_stock_base_info", `
+  코스피, 코스닥, 코넥스에 상장되어있는 종목의 기준일에 해당하는 한글 종목명, 영문 종목명, 상장일, 주식종류, 액면가, 상장주식수 등의 정보를 제공합니다.
+  codeList에 종목코드가 포함된 종목들의의 정보만 추출됩니다.
+  basDd 하나당 KRX API를 한번씩 호출합니다.
+  `, krx.getBaseInfoSchema.shape, async (params) => {
+    const args = krx.getBaseInfoSchema.parse(params);
+    const response = await krx.getBaseInfo(args);
+    return {
+        content: [{ type: "text", text: JSON.stringify(response) }],
+    };
+});
+server.tool("get_stock_trade_info", `
+  코스피, 코스닥, 코넥스에 상장되어있는 종목의 기준일에 해당하는 종가, 등락률, 시가, 고가, 저가, 거래량, 거대금, 시총액, 상장주식수 등의 정보를 제공합니다.
+  codeList에 종목코드가 포함된 종목들의의 정보만 추출되어 제공됩니다.
+  basDd 하나당 KRX API를 한번씩 호출합니다.
+  `, krx.getTradeInfoSchema.shape, async (params) => {
+    const args = krx.getTradeInfoSchema.parse(params);
+    const response = await krx.getTradeInfo(args);
+    return {
+        content: [{ type: "text", text: JSON.stringify(response) }],
+    };
+});
+/**
+ * Common
+ */
+server.tool("get_today_date", "오늘 날짜를 KST, UTC 기준 YYYYMMDD 형식으로 제공합니다.", {}, () => {
+    const response = common.getToday();
+    return {
+        content: [{ type: "text", text: JSON.stringify(response) }],
+    };
+});
+async function main() {
+    const transport = new StdioServerTransport();
+    await server.connect(transport);
+    console.error("Korea Dart MCP Server running on stdio");
+}
+main().catch((error) => {
+    console.error("Fatal error in main():", error);
+    process.exit(1);
+});
